@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual environments
+.venv/
+venv/
+env/
+japanese_progress_tracker/
+
+# Secrets
+.streamlit/secrets.toml
+
+# OS
+.DS_Store
+
+# Streamlit cache
+.streamlit/cache/
