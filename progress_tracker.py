@@ -1,27 +1,77 @@
 import streamlit as st
 import pandas as pd
 from datetime import date, timedelta
+from supabase import create_client
 
 # -----------------------------
 # CONFIG
 # -----------------------------
 st.set_page_config(page_title="Japanese Learning Tracker", layout="wide")
 
-DATA_FILE = "schedule.csv"
+# -----------------------------
+# SUPABASE CONNECTION
+# -----------------------------
+@st.cache_resource
+def get_supabase():
+    return create_client(
+        st.secrets["SUPABASE_URL"],
+        st.secrets["SUPABASE_KEY"]
+    )
+
+supabase = get_supabase()
 
 # -----------------------------
-# DATA HELPERS
+# DATA HELPERS (DB)
 # -----------------------------
+START_DATE = date(2026, 3, 26)  # adjust if needed
+
+
+def get_day_date(day_number: int):
+    return START_DATE + timedelta(days=day_number - 1)
+
+
 def load_data():
-    try:
-        df = pd.read_csv(DATA_FILE, parse_dates=["date"])
-    except FileNotFoundError:
-        df = pd.DataFrame(columns=["date", "task", "completed"])
-    return df
+    response = supabase.table("day_tasks") \
+        .select("""
+            id,
+            completed,
+            position,
+            task_templates(name, duration),
+            days(day_number)
+        """) \
+        .order("position") \
+        .execute()
+
+    data = response.data if response.data else []
+
+    rows = []
+    for row in data:
+        day_number = row["days"]["day_number"]
+        task_date = get_day_date(day_number)
+
+        rows.append({
+            "id": row["id"],
+            "date": pd.to_datetime(task_date),
+            "task": row["task_templates"]["name"],
+            "duration": row["task_templates"]["duration"],
+            "completed": row["completed"]
+        })
+
+    return pd.DataFrame(rows)
 
 
 def save_data(df):
-    df.to_csv(DATA_FILE, index=False)
+    for _, row in df.iterrows():
+        supabase.table("day_tasks") \
+            .update({"completed": bool(row["completed"])}) \
+            .eq("id", int(row["id"])) \
+            .execute()
+
+        if row["completed"]:
+            supabase.table("study_logs").insert({
+                "day_task_id": int(row["id"]),
+                "duration_spent": float(row.get("duration", 0))
+            }).execute()
 
 
 # -----------------------------
@@ -35,13 +85,7 @@ def add_task_ui(df):
         submitted = st.form_submit_button("Add Task")
 
         if submitted and task_text:
-            new_row = pd.DataFrame([
-                {"date": task_date, "task": task_text, "completed": False}
-            ])
-            df = pd.concat([df, new_row], ignore_index=True)
-            save_data(df)
-            st.success("Task added!")
-            st.rerun()
+            st.info("Custom tasks not supported with DB yet.")
 
 
 def today_view(df):
@@ -57,9 +101,14 @@ def today_view(df):
     for idx, row in today_tasks.iterrows():
         col1, col2 = st.columns([0.8, 0.2])
         with col1:
-            st.write(f"- {row['task']}")
+            duration = row.get("duration", None)
+            if duration:
+                st.write(f"- {row['task']} ({duration}h)")
+            else:
+                st.write(f"- {row['task']}")
+
         with col2:
-            done = st.checkbox("Done", value=row["completed"], key=f"done_{idx}")
+            done = st.checkbox("Done", value=row["completed"], key=f"done_{row['id']}")
             if done != row["completed"]:
                 df.at[idx, "completed"] = done
                 save_data(df)
@@ -119,7 +168,6 @@ def calculate_streak(df):
 # -----------------------------
 # MAIN APP
 # -----------------------------
-
 def main():
     st.title("🇯🇵 Japanese Learning Tracker")
 
