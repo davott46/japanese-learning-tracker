@@ -1,0 +1,36 @@
+TABLE : day_tasks
+id:                 int8;       NOT NULL; AUOT-GENERATED
+day_id:             int8;       NOT NULL
+task_template_id:   int8;       NOT NULL
+completed:          bool;       NOT NULL
+position:           int4;       NOT NULL
+custom_duration:    numeric;    NULL
+
+
+TABLE : days
+id:                 int8;       NOT NULL; AUOT-GENERATED
+day_number:         int4;       NOT NULL; UNIQUE
+week:               int4;       NOT NULL
+lesson_id:          int8;       NULL
+type:               text;       NOT NULL
+
+
+TABLE : lessons
+id:                 int8;       NOT NULL; AUOT-GENERATED
+name:               text;       NOT NULL
+book:               text;       NOT NULL
+goal:               text;       NOT NULL
+code:               text;       NOT NULL; UNIQUE
+
+
+TABLE : study_logs
+id:                 int8;       NOT NULL; AUOT-GENERATED
+day_task_id:        int8;       NOT NULL
+completed_at:       timestamp;  NOT NULL
+duration_spent:     numeric;    NULL
+
+TABLE : task_templates
+id:                 int8;       NOT NULL; AUOT-GENERATED
+block:              text;       NOT NULL
+name:               text;       NOT NULL
+duration:           numeric;    NOT NULL
